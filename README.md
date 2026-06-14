@@ -6,6 +6,11 @@ Playwright-based website monitoring for developers. Define checks, run multi-ste
 [![npm downloads](https://img.shields.io/npm/dm/@alosha/monitor)](https://www.npmjs.com/package/@alosha/monitor)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+- **Real user journeys, not just pings** — click, fill, hover, and wait through multi-step flows like login or checkout.
+- **Assert on what matters** — page title, URL, element visibility, text content, and response time.
+- **Get told the moment something breaks** — alerts to Slack, Discord, email, or any webhook.
+- **Evidence on every failure** — automatic screenshots and a self-contained HTML report, runnable locally or in CI/GitHub Actions.
+
 ## Install
 
 ```bash
