@@ -23,9 +23,9 @@ import type { MonitorConfig } from '@alosha/monitor'
 
 export default {
   checks: [
-    { name: 'Homepage',    url: 'https://yoursite.com' },
-    { name: 'Login page',  url: 'https://yoursite.com/login', retries: 3 },
-    { name: 'API health',  url: 'https://api.yoursite.com/health' },
+    { name: 'Homepage',    url: 'https://yoursite.com',              interval: '5m' },
+    { name: 'Login page',  url: 'https://yoursite.com/login',        interval: '10m', retries: 3 },
+    { name: 'API health',  url: 'https://api.yoursite.com/health',   interval: '1m' },
   ],
   notify: {
     email: {
@@ -39,13 +39,19 @@ export default {
 } satisfies MonitorConfig
 ```
 
-Then run:
+Then run once:
 
 ```bash
 npx monitor run
 ```
 
-You'll get a terminal summary and an `monitor-report.html` file.
+Or keep it running on a schedule:
+
+```bash
+npx monitor watch
+```
+
+`watch` runs each check immediately, then repeats on its `interval`. You'll get a live terminal feed and an auto-updating `monitor-report.html`.
 
 ## Configuration
 
@@ -62,6 +68,7 @@ You'll get a terminal summary and an `monitor-report.html` file.
 |---|---|---|---|
 | `name` | `string` | required | Human-readable label |
 | `url` | `string` | required | Full URL to check |
+| `interval` | `string` | `"5m"` | How often to check in watch mode. Supports `"30s"`, `"5m"`, `"1h"`, `"2h30m"` |
 | `retries` | `number` | `2` | Retry attempts before marking failed |
 | `timeout` | `number` | `10000` | Timeout in ms |
 | `screenshotOnFailure` | `boolean` | `true` | Save a screenshot on failure |
@@ -80,13 +87,20 @@ notify: {
 ## Programmatic usage
 
 ```ts
-import { run } from '@alosha/monitor'
+import { run, watch } from '@alosha/monitor'
 
+// One-shot run
 const report = await run({
   checks: [{ name: 'Homepage', url: 'https://example.com' }],
 })
-
 console.log(report.passed, report.failed)
+
+// Continuous watch
+await watch({
+  checks: [
+    { name: 'Homepage', url: 'https://example.com', interval: '5m' },
+  ],
+})
 ```
 
 ## GitHub Actions
