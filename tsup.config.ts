@@ -1,0 +1,22 @@
+import { defineConfig } from 'tsup'
+
+export default defineConfig([
+  // Library entry
+  {
+    entry: ['src/index.ts'],
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    clean: true,
+    target: 'node18',
+  },
+  // CLI entry (ESM only, executable)
+  {
+    entry: ['src/cli.ts'],
+    format: ['esm'],
+    banner: { js: '#!/usr/bin/env node' },
+    sourcemap: true,
+    target: 'node18',
+    noExternal: [],
+  },
+])

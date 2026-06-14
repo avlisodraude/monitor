@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+*.env.local
+monitor-screenshots/
+monitor-report.html
+coverage/
