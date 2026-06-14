@@ -1,6 +1,6 @@
 {
   "name": "@alosha/monitor",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Playwright-based website monitoring — zero-config uptime checks, retries, screenshots on failure, and multi-channel alerts.",
   "keywords": [
     "monitoring",
