@@ -4,6 +4,7 @@ import { generateReport } from './report.js'
 import type { MonitorConfig, RunReport } from './types.js'
 
 export type { MonitorConfig, CheckConfig, NotifyConfig, CheckResult, RunReport } from './types.js'
+export { watch, parseInterval } from './scheduler.js'
 
 /**
  * Run all checks defined in the config.

@@ -1,7 +1,7 @@
 import { pathToFileURL } from 'url'
 import path from 'path'
 import fs from 'fs'
-import { run } from './index.js'
+import { run, watch } from './index.js'
 import type { MonitorConfig } from './types.js'
 
 const [, , command = 'run'] = process.argv
@@ -45,9 +45,12 @@ async function main() {
     console.log(`  Report: ./monitor-report.html`)
 
     if (report.failed > 0) process.exit(1)
+  } else if (command === 'watch') {
+    const config = await loadConfig()
+    await watch(config)
   } else {
     console.log(`Unknown command: ${command}`)
-    console.log('Usage: monitor run')
+    console.log('Usage: monitor run | monitor watch')
     process.exit(1)
   }
 }
