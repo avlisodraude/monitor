@@ -1,6 +1,6 @@
 # @alosha/monitor
 
-Playwright-based website monitoring for developers. Define checks, get notified on failures, generate HTML reports — all from your terminal or CI pipeline.
+Playwright-based website monitoring for developers. Define checks, run multi-step journeys, assert on content, get notified on failures, and generate HTML reports — all from your terminal or CI pipeline.
 
 [![npm version](https://img.shields.io/npm/v/@alosha/monitor)](https://www.npmjs.com/package/@alosha/monitor)
 [![npm downloads](https://img.shields.io/npm/dm/@alosha/monitor)](https://www.npmjs.com/package/@alosha/monitor)
@@ -10,9 +10,8 @@ Playwright-based website monitoring for developers. Define checks, get notified 
 
 ```bash
 npm install -D @alosha/monitor
+npx playwright install chromium
 ```
-
-> Playwright browsers are installed automatically on first run via `playwright install chromium`.
 
 ## Quick start
 
@@ -23,18 +22,29 @@ import type { MonitorConfig } from '@alosha/monitor'
 
 export default {
   checks: [
-    { name: 'Homepage',    url: 'https://yoursite.com',              interval: '5m' },
-    { name: 'Login page',  url: 'https://yoursite.com/login',        interval: '10m', retries: 3 },
-    { name: 'API health',  url: 'https://api.yoursite.com/health',   interval: '1m' },
+    // Simple URL check
+    { name: 'Homepage', url: 'https://yoursite.com', interval: '5m' },
+
+    // Multi-step journey with assertions
+    {
+      name: 'Login flow',
+      url: 'https://yoursite.com/login',
+      interval: '10m',
+      steps: [
+        { action: 'fill', selector: '#email', value: 'test@example.com' },
+        { action: 'fill', selector: '#password', value: process.env.TEST_PASS! },
+        { action: 'click', selector: 'button[type=submit]' },
+        { action: 'waitForURL', value: '/dashboard' },
+      ],
+      assertions: [
+        { type: 'title', contains: 'Dashboard' },
+        { type: 'visible', selector: '.welcome-message' },
+        { type: 'responseTime', maxMs: 3000 },
+      ],
+    },
   ],
   notify: {
-    email: {
-      to: 'you@example.com',
-      from: 'monitor@yoursite.com',
-      smtpHost: process.env.SMTP_HOST!,
-      smtpUser: process.env.SMTP_USER!,
-      smtpPass: process.env.SMTP_PASS!,
-    },
+    slack: { webhookUrl: process.env.SLACK_WEBHOOK_URL! },
   },
 } satisfies MonitorConfig
 ```
@@ -51,13 +61,11 @@ Or keep it running on a schedule:
 npx monitor watch
 ```
 
-`watch` runs each check immediately, then repeats on its `interval`. You'll get a live terminal feed and an auto-updating `monitor-report.html`.
-
 ## Configuration
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `checks` | `CheckConfig[]` | required | List of URLs to monitor |
+| `checks` | `CheckConfig[]` | required | List of checks to run |
 | `notify` | `NotifyConfig` | — | Alert destinations |
 | `screenshotsDir` | `string` | `./monitor-screenshots` | Where to save failure screenshots |
 | `reportsDir` | `string` | `.` | Where to save `monitor-report.html` |
@@ -67,11 +75,41 @@ npx monitor watch
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `name` | `string` | required | Human-readable label |
-| `url` | `string` | required | Full URL to check |
-| `interval` | `string` | `"5m"` | How often to check in watch mode. Supports `"30s"`, `"5m"`, `"1h"`, `"2h30m"` |
+| `url` | `string` | required | Full URL to navigate to |
+| `interval` | `string` | `"5m"` | Watch mode interval. Supports `"30s"`, `"5m"`, `"1h"`, `"2h30m"` |
 | `retries` | `number` | `2` | Retry attempts before marking failed |
-| `timeout` | `number` | `10000` | Timeout in ms |
+| `timeout` | `number` | `10000` | Timeout per action in ms |
 | `screenshotOnFailure` | `boolean` | `true` | Save a screenshot on failure |
+| `steps` | `StepAction[]` | — | Multi-step journey actions |
+| `assertions` | `Assertion[]` | — | Assertions to verify after steps |
+| `maxResponseTimeMs` | `number` | — | Shorthand for `{ type: 'responseTime', maxMs }` assertion |
+
+### Steps
+
+```ts
+steps: [
+  { action: 'click',            selector: 'button' },
+  { action: 'fill',             selector: '#email', value: 'user@example.com' },
+  { action: 'select',           selector: 'select#plan', value: 'pro' },
+  { action: 'hover',            selector: '.dropdown' },
+  { action: 'waitForSelector',  selector: '.modal' },
+  { action: 'waitForURL',       value: '/dashboard' },
+  { action: 'waitForLoadState', value: 'networkidle' },
+  { action: 'screenshot',       name: 'after-login' },
+]
+```
+
+### Assertions
+
+```ts
+assertions: [
+  { type: 'title',        contains: 'Dashboard' },
+  { type: 'url',          contains: '/dashboard' },
+  { type: 'visible',      selector: '.welcome-message' },
+  { type: 'text',         selector: 'h1', contains: 'Welcome' },
+  { type: 'responseTime', maxMs: 3000 },
+]
+```
 
 ### Notifications
 
@@ -84,34 +122,51 @@ notify: {
 }
 ```
 
+## GitHub Actions
+
+Drop this in `.github/workflows/monitor.yml` to run your checks every 15 minutes in CI:
+
+```yaml
+name: Monitor
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npx playwright install chromium --with-deps
+      - run: npx monitor run
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: monitor-report
+          path: |
+            monitor-report.html
+            monitor-screenshots/
+```
+
 ## Programmatic usage
 
 ```ts
 import { run, watch } from '@alosha/monitor'
 
 // One-shot run
-const report = await run({
-  checks: [{ name: 'Homepage', url: 'https://example.com' }],
-})
+const report = await run({ checks: [{ name: 'Homepage', url: 'https://example.com' }] })
 console.log(report.passed, report.failed)
 
 // Continuous watch
-await watch({
-  checks: [
-    { name: 'Homepage', url: 'https://example.com', interval: '5m' },
-  ],
-})
-```
-
-## GitHub Actions
-
-```yaml
-- name: Run monitors
-  run: npx monitor run
-  env:
-    SMTP_HOST: ${{ secrets.SMTP_HOST }}
-    SMTP_USER: ${{ secrets.SMTP_USER }}
-    SMTP_PASS: ${{ secrets.SMTP_PASS }}
+await watch({ checks: [{ name: 'Homepage', url: 'https://example.com', interval: '5m' }] })
 ```
 
 ---

@@ -2,23 +2,51 @@ import fs from 'fs'
 import path from 'path'
 import type { RunReport, CheckResult } from './types.js'
 
-function statusBadge(result: CheckResult): string {
-  return result.status === 'ok'
+function badge(status: 'ok' | 'fail'): string {
+  return status === 'ok'
     ? '<span class="badge ok">✓ OK</span>'
     : '<span class="badge fail">✗ FAIL</span>'
+}
+
+function stepsHtml(result: CheckResult): string {
+  if (!result.steps?.length && !result.assertions?.length) return ''
+
+  const stepRows = (result.steps ?? []).map(s => `
+    <tr class="sub ${s.status}">
+      <td>${badge(s.status)}</td>
+      <td class="sub-label">↳ step</td>
+      <td colspan="3">${s.description}</td>
+      <td>${s.durationMs}ms</td>
+      <td>${s.error ?? '—'}</td>
+      <td>${s.screenshotPath ? `<a href="${s.screenshotPath}">view</a>` : '—'}</td>
+    </tr>`).join('')
+
+  const assertionRows = (result.assertions ?? []).map(a => `
+    <tr class="sub ${a.status}">
+      <td>${badge(a.status)}</td>
+      <td class="sub-label">↳ assert</td>
+      <td colspan="3">${a.description}</td>
+      <td>—</td>
+      <td>${a.error ?? '—'}</td>
+      <td>—</td>
+    </tr>`).join('')
+
+  return stepRows + assertionRows
 }
 
 function row(result: CheckResult): string {
   return `
     <tr class="${result.status}">
-      <td>${statusBadge(result)}</td>
-      <td>${result.name}</td>
+      <td>${badge(result.status)}</td>
+      <td></td>
+      <td><strong>${result.name}</strong></td>
       <td><a href="${result.url}" target="_blank">${result.url}</a></td>
       <td>${result.statusCode ?? '—'}</td>
       <td>${result.durationMs}ms</td>
       <td>${result.error ?? '—'}</td>
       <td>${result.screenshotPath ? `<a href="${result.screenshotPath}">view</a>` : '—'}</td>
-    </tr>`
+    </tr>
+    ${stepsHtml(result)}`
 }
 
 export function generateReport(report: RunReport, outputDir: string): string {
@@ -28,7 +56,7 @@ export function generateReport(report: RunReport, outputDir: string): string {
   <meta charset="UTF-8" />
   <title>Monitor Report — ${report.ranAt}</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #111; }
+    body { font-family: system-ui, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; color: #111; }
     h1 { font-size: 1.4rem; }
     .summary { display: flex; gap: 1.5rem; margin: 1rem 0 2rem; }
     .stat { background: #f4f4f4; border-radius: 8px; padding: 0.75rem 1.25rem; }
@@ -37,18 +65,23 @@ export function generateReport(report: RunReport, outputDir: string): string {
     .stat.ok span { color: #080; }
     table { width: 100%; border-collapse: collapse; }
     th { text-align: left; border-bottom: 2px solid #ddd; padding: 0.5rem; font-size: 0.8rem; text-transform: uppercase; color: #666; }
-    td { padding: 0.6rem 0.5rem; border-bottom: 1px solid #eee; font-size: 0.9rem; }
-    tr.fail td { background: #fff5f5; }
-    .badge { padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem; }
+    td { padding: 0.5rem; border-bottom: 1px solid #eee; font-size: 0.9rem; vertical-align: top; }
+    tr.fail > td { background: #fff5f5; }
+    tr.sub td { background: #fafafa; font-size: 0.82rem; color: #444; border-bottom: 1px solid #f0f0f0; }
+    tr.sub.fail td { background: #fff8f8; }
+    .sub-label { color: #aaa; font-size: 0.75rem; white-space: nowrap; }
+    .badge { padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.78rem; white-space: nowrap; }
     .badge.ok { background: #e6f9ee; color: #080; }
     .badge.fail { background: #fde8e8; color: #d00; }
+    a { color: #0070f3; text-decoration: none; }
+    a:hover { text-decoration: underline; }
     footer { margin-top: 3rem; font-size: 0.75rem; color: #999; text-align: center; }
     footer a { color: #999; }
   </style>
 </head>
 <body>
   <h1>Monitor Report</h1>
-  <p>Run at: ${report.ranAt}</p>
+  <p style="color:#666;font-size:0.9rem">Run at: ${report.ranAt}</p>
   <div class="summary">
     <div class="stat ok"><span>${report.passed}</span>Passed</div>
     <div class="stat fail"><span>${report.failed}</span>Failed</div>
@@ -57,7 +90,7 @@ export function generateReport(report: RunReport, outputDir: string): string {
   <table>
     <thead>
       <tr>
-        <th>Status</th><th>Name</th><th>URL</th><th>Code</th><th>Duration</th><th>Error</th><th>Screenshot</th>
+        <th>Status</th><th></th><th>Name</th><th>URL</th><th>Code</th><th>Duration</th><th>Error</th><th>Screenshot</th>
       </tr>
     </thead>
     <tbody>
