@@ -2,8 +2,9 @@ import type { MonitorConfig } from "@alosha/monitor";
 
 export default {
   checks: [
-    { name: "Alosha", url: "https://alosha.dev" },
-    { name: "PixSqueeze", url: "https://pixsqueeze.alosha.dev" },
+    { name: "Alosha", url: "https://alosha.dev", interval: "5m" },
+    { name: "PixSqueeze", url: "https://pixsqueeze.alosha.dev", interval: "5m" },
+    { name: "Monitor", url: "https://monitor.alosha.dev", interval: "5m" },
   ],
   notify: {
     email: {
