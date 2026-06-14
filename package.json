@@ -1,8 +1,15 @@
 {
   "name": "@alosha/monitor",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Playwright-based website monitoring — checks, retries, screenshots, and alerts.",
-  "keywords": ["monitor", "playwright", "uptime", "website-monitoring", "alerting", "cli"],
+  "keywords": [
+    "monitor",
+    "playwright",
+    "uptime",
+    "website-monitoring",
+    "alerting",
+    "cli"
+  ],
   "homepage": "https://monitor.alosha.dev",
   "bugs": {
     "url": "https://github.com/avlisodraude/monitor/issues"
