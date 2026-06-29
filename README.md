@@ -4,6 +4,7 @@ Playwright-based website monitoring for developers. Define checks, run multi-ste
 
 [![npm version](https://img.shields.io/npm/v/@alosha/monitor)](https://www.npmjs.com/package/@alosha/monitor)
 [![npm downloads](https://img.shields.io/npm/dm/@alosha/monitor)](https://www.npmjs.com/package/@alosha/monitor)
+[![Types included](https://img.shields.io/badge/types-included-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 - **Real user journeys, not just pings** — click, fill, hover, and wait through multi-step flows like login or checkout.
@@ -65,6 +66,56 @@ Or keep it running on a schedule:
 ```bash
 npx monitor watch
 ```
+
+## Production recipes
+
+Real problems, complete solutions — copy, paste, ship.
+
+### Fail your CI build when a critical user journey breaks
+
+**The problem:** a deploy can pass unit tests but still break login or checkout in a real browser — and you find out from a customer.
+
+```ts
+import { run } from '@alosha/monitor'
+
+const report = await run({
+  checks: [{
+    name: 'Login flow',
+    url: 'https://app.example.com/login',
+    steps: [
+      { action: 'fill',  selector: '#email',    value: process.env.TEST_EMAIL! },
+      { action: 'fill',  selector: '#password', value: process.env.TEST_PASS! },
+      { action: 'click', selector: 'button[type=submit]' },
+      { action: 'waitForURL', value: '**/dashboard' }
+    ],
+    assertions: [{ type: 'visible', selector: '[data-test=user-menu]' }]
+  }]
+})
+
+// Break the build if any check failed.
+if (report.failed > 0) process.exit(1)
+```
+
+**Why it works:** `run()` drives a real Chromium session through the journey and returns a structured `RunReport`, so a single exit-code check turns "does login still work?" into a CI gate that blocks the deploy before users ever see the break.
+
+### Get a Slack alert with a screenshot the moment a page goes down
+
+**The problem:** uptime pings tell you a URL returns 200, not that the page actually rendered — and they rarely show you what the user saw.
+
+```ts
+import { watch } from '@alosha/monitor'
+
+// Runs continuously, firing each check on its own interval.
+await watch({
+  checks: [
+    { name: 'Homepage', url: 'https://example.com', interval: '1m', maxResponseTimeMs: 2000 },
+    { name: 'Checkout', url: 'https://example.com/checkout', interval: '5m' }
+  ],
+  notify: { slack: { webhookUrl: process.env.SLACK_WEBHOOK_URL! } }
+})
+```
+
+**Why it works:** `watch()` schedules each check independently and, on failure, captures a full-page screenshot before posting to Slack — so your first signal of an outage is an alert with visual proof, not a support ticket.
 
 ## Configuration
 
@@ -174,8 +225,15 @@ console.log(report.passed, report.failed)
 await watch({ checks: [{ name: 'Homepage', url: 'https://example.com', interval: '5m' }] })
 ```
 
+## Support & custom work
+
+`@alosha/monitor` is free and MIT-licensed, and always will be. When you need more than the open-source CLI, there's a paid path backed by the maintainer — not a ticket queue:
+
+- **Priority support** — a direct line to the person who wrote it, with prioritised fixes.
+- **Custom work** — bespoke checks, assertions or notifier integrations, and help wiring Monitor into your CI/CD.
+
+Get in touch at [alosha.dev/support](https://alosha.dev/support).
+
 ---
 
-Want hosted monitoring, dashboards, and team alerts? → [monitor.alosha.dev](https://monitor.alosha.dev)
-
-Built by [Alosha](https://alosha.dev)
+Docs & live demo: [monitor.alosha.dev](https://monitor.alosha.dev) · Built by [Alosha](https://alosha.dev)
