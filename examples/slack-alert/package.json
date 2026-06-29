@@ -1,0 +1,14 @@
+{
+  "name": "slack-alert-example",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "monitor recipe: get a Slack alert with a screenshot the moment a page goes down",
+  "scripts": {
+    "postinstall": "playwright install chromium",
+    "start": "node watch.mjs"
+  },
+  "dependencies": {
+    "@alosha/monitor": "^0.3.3"
+  }
+}

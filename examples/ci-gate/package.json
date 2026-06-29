@@ -1,0 +1,14 @@
+{
+  "name": "ci-gate-example",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "monitor recipe: fail your CI build when a critical user journey breaks",
+  "scripts": {
+    "postinstall": "playwright install chromium",
+    "start": "node run.mjs"
+  },
+  "dependencies": {
+    "@alosha/monitor": "^0.3.3"
+  }
+}
