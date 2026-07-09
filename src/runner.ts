@@ -1,4 +1,4 @@
-import { chromium, type Page } from 'playwright'
+import type { Browser, Page } from 'playwright'
 import path from 'path'
 import fs from 'fs'
 import type {
@@ -148,7 +148,8 @@ async function runAssertion(
 
 export async function runCheck(
   check: CheckConfig,
-  screenshotsDir: string
+  screenshotsDir: string,
+  browser: Browser
 ): Promise<CheckResult> {
   const retries = check.retries ?? 2
   const timeout = check.timeout ?? 10_000
@@ -164,99 +165,106 @@ export async function runCheck(
   let lastError: string | undefined
   let lastStatusCode: number | undefined
 
-  for (let attempt = 1; attempt <= retries + 1; attempt++) {
-    const browser = await chromium.launch()
-    const page = await browser.newPage()
-    const start = Date.now()
+  // One context per check — cheap to create, and gives each check the same
+  // cookie/storage isolation a dedicated browser would, without the launch cost.
+  const context = await browser.newContext()
 
-    try {
-      const response = await page.goto(check.url, {
-        timeout,
-        waitUntil: 'domcontentloaded',
-      })
+  try {
+    for (let attempt = 1; attempt <= retries + 1; attempt++) {
+      const page = await context.newPage()
+      const start = Date.now()
 
-      lastStatusCode = response?.status()
-      const ok = response?.ok() ?? false
+      try {
+        const response = await page.goto(check.url, {
+          timeout,
+          waitUntil: 'domcontentloaded',
+        })
 
-      if (!ok) {
-        lastError = `HTTP ${lastStatusCode}`
-        throw new Error(lastError)
-      }
+        lastStatusCode = response?.status()
+        const ok = response?.ok() ?? false
 
-      const durationMs = Date.now() - start
+        if (!ok) {
+          lastError = `HTTP ${lastStatusCode}`
+          throw new Error(lastError)
+        }
 
-      // Run steps
-      const stepResults: StepResult[] = []
-      if (check.steps?.length) {
-        for (const step of check.steps) {
-          const result = await executeStep(page, step, timeout, screenshotsDir, check.name)
-          stepResults.push(result)
-          if (result.status === 'fail') {
-            lastError = `Step failed: ${result.description} — ${result.error}`
+        const durationMs = Date.now() - start
+
+        // Run steps
+        const stepResults: StepResult[] = []
+        if (check.steps?.length) {
+          for (const step of check.steps) {
+            const result = await executeStep(page, step, timeout, screenshotsDir, check.name)
+            stepResults.push(result)
+            if (result.status === 'fail') {
+              lastError = `Step failed: ${result.description} — ${result.error}`
+              throw new Error(lastError)
+            }
+          }
+        }
+
+        // Run assertions
+        const assertionResults: AssertionResult[] = []
+        if (assertions.length) {
+          for (const assertion of assertions) {
+            const result = await runAssertion(page, assertion, durationMs)
+            assertionResults.push(result)
+          }
+          const failedAssertion = assertionResults.find(a => a.status === 'fail')
+          if (failedAssertion) {
+            lastError = `Assertion failed: ${failedAssertion.description} — ${failedAssertion.error}`
             throw new Error(lastError)
           }
         }
-      }
 
-      // Run assertions
-      const assertionResults: AssertionResult[] = []
-      if (assertions.length) {
-        for (const assertion of assertions) {
-          const result = await runAssertion(page, assertion, durationMs)
-          assertionResults.push(result)
-        }
-        const failedAssertion = assertionResults.find(a => a.status === 'fail')
-        if (failedAssertion) {
-          lastError = `Assertion failed: ${failedAssertion.description} — ${failedAssertion.error}`
-          throw new Error(lastError)
-        }
-      }
-
-      await browser.close()
-      return {
-        name: check.name,
-        url: check.url,
-        status: 'ok',
-        statusCode: lastStatusCode,
-        durationMs,
-        timestamp,
-        attempt,
-        ...(stepResults.length ? { steps: stepResults } : {}),
-        ...(assertionResults.length ? { assertions: assertionResults } : {}),
-      }
-    } catch (err) {
-      if (!lastError) lastError = err instanceof Error ? err.message : String(err)
-
-      // Take screenshot on last failed attempt
-      let screenshotPath: string | undefined
-      if (screenshotOnFailure && attempt === retries + 1) {
-        fs.mkdirSync(screenshotsDir, { recursive: true })
-        const safeName = check.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()
-        screenshotPath = path.join(screenshotsDir, `${safeName}_${Date.now()}.png`)
-        try {
-          await page.screenshot({ path: screenshotPath, fullPage: true })
-        } catch {
-          screenshotPath = undefined
-        }
-      }
-
-      await browser.close()
-
-      if (attempt === retries + 1) {
+        await page.close()
         return {
           name: check.name,
           url: check.url,
-          status: 'fail',
+          status: 'ok',
           statusCode: lastStatusCode,
-          durationMs: Date.now() - start,
-          error: lastError,
-          screenshotPath,
+          durationMs,
           timestamp,
           attempt,
+          ...(stepResults.length ? { steps: stepResults } : {}),
+          ...(assertionResults.length ? { assertions: assertionResults } : {}),
+        }
+      } catch (err) {
+        if (!lastError) lastError = err instanceof Error ? err.message : String(err)
+
+        // Take screenshot on last failed attempt
+        let screenshotPath: string | undefined
+        if (screenshotOnFailure && attempt === retries + 1) {
+          fs.mkdirSync(screenshotsDir, { recursive: true })
+          const safeName = check.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+          screenshotPath = path.join(screenshotsDir, `${safeName}_${Date.now()}.png`)
+          try {
+            await page.screenshot({ path: screenshotPath, fullPage: true })
+          } catch {
+            screenshotPath = undefined
+          }
+        }
+
+        await page.close()
+
+        if (attempt === retries + 1) {
+          return {
+            name: check.name,
+            url: check.url,
+            status: 'fail',
+            statusCode: lastStatusCode,
+            durationMs: Date.now() - start,
+            error: lastError,
+            screenshotPath,
+            timestamp,
+            attempt,
+          }
         }
       }
     }
-  }
 
-  throw new Error('Unexpected end of runCheck')
+    throw new Error('Unexpected end of runCheck')
+  } finally {
+    await context.close()
+  }
 }

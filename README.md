@@ -125,6 +125,7 @@ await watch({
 | `notify` | `NotifyConfig` | — | Alert destinations |
 | `screenshotsDir` | `string` | `./monitor-screenshots` | Where to save failure screenshots |
 | `reportsDir` | `string` | `.` | Where to save `monitor-report.html` |
+| `concurrency` | `number` | `4` | Max checks running at once against the shared browser |
 
 ### CheckConfig
 

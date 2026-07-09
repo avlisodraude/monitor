@@ -96,6 +96,8 @@ export interface MonitorConfig {
   screenshotsDir?: string
   /** Directory to save HTML reports. Default: "." */
   reportsDir?: string
+  /** Max number of checks running concurrently against the shared browser. Default: 4 */
+  concurrency?: number
 }
 
 // ---------------------------------------------------------------------------

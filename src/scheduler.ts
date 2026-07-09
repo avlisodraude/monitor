@@ -1,6 +1,8 @@
 import { runCheck } from './runner.js'
 import { notify } from './notify.js'
 import { generateReport } from './report.js'
+import { getBrowser, closeBrowser } from './browser.js'
+import { createLimiter } from './concurrency.js'
 import type { MonitorConfig, CheckResult } from './types.js'
 
 /**
@@ -36,9 +38,24 @@ function timestamp(): string {
 export async function watch(config: MonitorConfig): Promise<void> {
   const screenshotsDir = config.screenshotsDir ?? './monitor-screenshots'
   const reportsDir = config.reportsDir ?? '.'
+  const concurrency = config.concurrency ?? 4
 
   const DEFAULT_INTERVAL = '5m'
   const results: CheckResult[] = []
+
+  const browser = await getBrowser()
+  const limit = createLimiter(concurrency)
+
+  let shuttingDown = false
+  const shutdown = async () => {
+    if (shuttingDown) return
+    shuttingDown = true
+    console.log('\n\n  Shutting down...')
+    await closeBrowser()
+    process.exit(0)
+  }
+  process.on('SIGINT', shutdown)
+  process.on('SIGTERM', shutdown)
 
   console.log('\n👁  @alosha/monitor — watch mode\n')
 
@@ -50,7 +67,7 @@ export async function watch(config: MonitorConfig): Promise<void> {
     console.log(`  ⏱  ${check.name} — every ${formatInterval(intervalMs)}`)
 
     const runAndLog = async () => {
-      const result = await runCheck(check, screenshotsDir)
+      const result = await limit(() => runCheck(check, screenshotsDir, browser))
       const icon = result.status === 'ok' ? '✓' : '✗'
       const label = result.status === 'ok' ? 'OK  ' : 'FAIL'
       console.log(`  ${icon} [${label}] [${timestamp()}] ${result.name} — ${result.durationMs}ms${result.error ? ` — ${result.error}` : ''}`)
