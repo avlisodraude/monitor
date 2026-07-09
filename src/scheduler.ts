@@ -121,9 +121,22 @@ export async function watch(config: MonitorConfig): Promise<void> {
       alertStates.set(check.name, state)
     }
 
+    // Schedule the next run only after the current one finishes, so a run
+    // that outlives its interval (easy with retries) can't overlap with the next.
+    const scheduleNext = () => {
+      if (shuttingDown) return
+      setTimeout(() => {
+        runAndLog()
+          .catch((err) => {
+            console.error(`  ⚠ ${check.name}: unexpected error — ${err instanceof Error ? err.message : String(err)}`)
+          })
+          .finally(scheduleNext)
+      }, intervalMs)
+    }
+
     // Run immediately, then on interval
     await runAndLog()
-    setInterval(runAndLog, intervalMs)
+    scheduleNext()
   }
 
   console.log('\n  Watching... (Ctrl+C to stop)\n')
