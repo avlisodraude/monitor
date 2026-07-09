@@ -117,6 +117,18 @@ await watch({
 
 **Why it works:** `watch()` schedules each check independently and, on failure, captures a full-page screenshot before posting to Slack — so your first signal of an outage is an alert with visual proof, not a support ticket.
 
+### Alert semantics in watch mode
+
+`watch()` notifies only on **status transitions**, not on every failing run: you get one alert when a check goes from ok to failing, and one recovery alert when it goes back to ok. A site that's down for an hour at `interval: '1m'` sends exactly one alert, not sixty.
+
+For outages you want to be reminded about while they're ongoing, set `reAlertInterval` on the check (e.g. `'30m'`) to re-send the down alert on that cadence until it recovers. It defaults to off — sustained failures stay silent between the initial alert and the recovery alert.
+
+```ts
+{ name: 'Checkout', url: 'https://example.com/checkout', interval: '1m', reAlertInterval: '30m' }
+```
+
+This state is per-process: restarting `watch()` forgets prior status, so the first result for each check after a restart is treated as a transition if it's a failure (you'll get a fresh down alert, not silence).
+
 ## Configuration
 
 | Option | Type | Default | Description |
@@ -134,6 +146,7 @@ await watch({
 | `name` | `string` | required | Human-readable label |
 | `url` | `string` | required | Full URL to navigate to |
 | `interval` | `string` | `"5m"` | Watch mode interval. Supports `"30s"`, `"5m"`, `"1h"`, `"2h30m"` |
+| `reAlertInterval` | `string` | off | Watch mode: re-send the down alert on this cadence while a check stays failing |
 | `retries` | `number` | `2` | Retry attempts before marking failed |
 | `timeout` | `number` | `10000` | Timeout per action in ms |
 | `screenshotOnFailure` | `boolean` | `true` | Save a screenshot on failure |

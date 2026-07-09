@@ -50,6 +50,12 @@ export interface CheckConfig {
   url: string
   /** Interval between checks (e.g. "5m", "1h"). Used by scheduler. */
   interval?: string
+  /**
+   * In watch mode, how often to re-send an alert while this check remains
+   * failing (e.g. "30m"). Default: off — alert once on failure, once on
+   * recovery, and stay silent in between.
+   */
+  reAlertInterval?: string
   /** Number of retry attempts before reporting failure. Default: 2 */
   retries?: number
   /** Timeout per action in milliseconds. Default: 10000 */

@@ -1,11 +1,15 @@
 import nodemailer from 'nodemailer'
 import type { CheckResult, NotifyConfig } from './types.js'
 
-function buildMessage(result: CheckResult): string {
+export type AlertKind = 'down' | 'recovery'
+
+function buildMessage(result: CheckResult, kind: AlertKind): string {
   return [
-    `Monitor alert: "${result.name}" is DOWN`,
+    kind === 'recovery'
+      ? `Monitor alert: "${result.name}" has RECOVERED`
+      : `Monitor alert: "${result.name}" is DOWN`,
     `URL: ${result.url}`,
-    `Error: ${result.error ?? 'unknown'}`,
+    kind === 'down' ? `Error: ${result.error ?? 'unknown'}` : '',
     `Status code: ${result.statusCode ?? 'N/A'}`,
     `Time: ${result.timestamp}`,
     result.screenshotPath
@@ -18,9 +22,10 @@ function buildMessage(result: CheckResult): string {
 
 export async function notify(
   result: CheckResult,
-  config: NotifyConfig
+  config: NotifyConfig,
+  kind: AlertKind = 'down'
 ): Promise<void> {
-  const message = buildMessage(result)
+  const message = buildMessage(result, kind)
   const promises: Promise<void>[] = []
 
   // Email
@@ -36,7 +41,9 @@ export async function notify(
         .sendMail({
           from,
           to,
-          subject: `🔴 Monitor alert: ${result.name} is DOWN`,
+          subject: kind === 'recovery'
+            ? `🟢 Monitor alert: ${result.name} has recovered`
+            : `🔴 Monitor alert: ${result.name} is DOWN`,
           text: message,
         })
         .then(() => {})

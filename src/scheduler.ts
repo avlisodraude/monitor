@@ -3,7 +3,7 @@ import { notify } from './notify.js'
 import { generateReport } from './report.js'
 import { getBrowser, closeBrowser } from './browser.js'
 import { createLimiter } from './concurrency.js'
-import type { MonitorConfig, CheckResult } from './types.js'
+import type { MonitorConfig, CheckResult, CheckStatus } from './types.js'
 
 /**
  * Parse a human-readable interval string into milliseconds.
@@ -42,6 +42,10 @@ export async function watch(config: MonitorConfig): Promise<void> {
 
   const DEFAULT_INTERVAL = '5m'
   const results: CheckResult[] = []
+
+  // Per-check alert state, used to notify only on ok<->fail transitions
+  // (plus optional re-alerts for sustained outages) instead of every failing run.
+  const alertStates = new Map<string, { previousStatus?: CheckStatus; lastAlertAt?: number }>()
 
   const browser = await getBrowser()
   const limit = createLimiter(concurrency)
@@ -91,10 +95,30 @@ export async function watch(config: MonitorConfig): Promise<void> {
         reportsDir
       )
 
-      // Notify on failure
-      if (result.status === 'fail' && config.notify) {
-        await notify(result, config.notify)
+      // Notify only on ok<->fail transitions, plus optional re-alerts for
+      // sustained outages. The very first result for a check counts as a
+      // transition when it's a failure, so a check that starts down still alerts.
+      const state = alertStates.get(check.name) ?? {}
+      const isFirstRun = state.previousStatus === undefined
+      const transitioned = !isFirstRun && state.previousStatus !== result.status
+
+      let shouldNotify = false
+      if (result.status === 'fail' && (isFirstRun || transitioned)) {
+        shouldNotify = true
+      } else if (result.status === 'fail' && check.reAlertInterval) {
+        const reAlertMs = parseInterval(check.reAlertInterval)
+        shouldNotify = !state.lastAlertAt || Date.now() - state.lastAlertAt >= reAlertMs
+      } else if (result.status === 'ok' && transitioned) {
+        shouldNotify = true
       }
+
+      if (shouldNotify && config.notify) {
+        await notify(result, config.notify, result.status === 'ok' ? 'recovery' : 'down')
+        state.lastAlertAt = Date.now()
+      }
+
+      state.previousStatus = result.status
+      alertStates.set(check.name, state)
     }
 
     // Run immediately, then on interval
