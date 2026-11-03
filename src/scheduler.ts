@@ -3,31 +3,15 @@ import { notify } from './notify.js'
 import { generateReport } from './report.js'
 import { getBrowser, closeBrowser } from './browser.js'
 import { createLimiter } from './concurrency.js'
+import { parseInterval, validateConfig } from './config.js'
 import type { MonitorConfig, CheckResult, CheckStatus } from './types.js'
 
-/**
- * Parse a human-readable interval string into milliseconds.
- * Supports: "30s", "5m", "1h", "2h30m", etc.
- */
-export function parseInterval(interval: string): number {
-  const clean = interval.trim().toLowerCase()
-  const hours = clean.match(/(\d+)h/)
-  const minutes = clean.match(/(\d+)m/)
-  const seconds = clean.match(/(\d+)s/)
-
-  const ms =
-    (hours ? parseInt(hours[1]) * 3_600_000 : 0) +
-    (minutes ? parseInt(minutes[1]) * 60_000 : 0) +
-    (seconds ? parseInt(seconds[1]) * 1_000 : 0)
-
-  if (ms === 0) throw new Error(`Invalid interval: "${interval}". Use formats like "30s", "5m", "1h", "2h30m".`)
-  return ms
-}
+export { parseInterval } from './config.js'
 
 function formatInterval(ms: number): string {
   const h = Math.floor(ms / 3_600_000)
   const m = Math.floor((ms % 3_600_000) / 60_000)
-  const s = Math.floor((ms % 60_000) / 1_000)
+  const s = (ms % 60_000) / 1_000
   return [h && `${h}h`, m && `${m}m`, s && `${s}s`].filter(Boolean).join('')
 }
 
@@ -36,6 +20,7 @@ function timestamp(): string {
 }
 
 export async function watch(config: MonitorConfig): Promise<void> {
+  validateConfig(config)
   const screenshotsDir = config.screenshotsDir ?? './monitor-screenshots'
   const reportsDir = config.reportsDir ?? '.'
   const concurrency = config.concurrency ?? 4

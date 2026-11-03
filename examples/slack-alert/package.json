@@ -9,6 +9,6 @@
     "start": "node watch.mjs"
   },
   "dependencies": {
-    "@alosha/monitor": "^0.3.3"
+    "@alosha/monitor": "^0.5.0"
   }
 }

@@ -13,16 +13,19 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Build monitor
+        run: npm run build
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
+        run: npm exec --no -- playwright install chromium --with-deps
 
       - name: Run monitors
-        run: npx monitor run
+        run: node dist/cli.js run
         env:
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_USER: ${{ secrets.SMTP_USER }}

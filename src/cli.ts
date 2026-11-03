@@ -29,7 +29,6 @@ async function main() {
   if (command === 'run') {
     console.log('🔍 @alosha/monitor — loading config...')
     const config = await loadConfig()
-    console.log(`  Running ${config.checks.length} check(s)...\n`)
 
     const report = await run(config)
 

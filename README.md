@@ -14,6 +14,8 @@ Playwright-based website monitoring for developers. Define checks, run multi-ste
 
 ## Install
 
+Monitor 0.5 requires Node.js 20 or later. Use Node.js 24 LTS for new installations and CI.
+
 ```bash
 npm install -D @alosha/monitor
 npx playwright install chromium
@@ -137,21 +139,23 @@ This state is per-process: restarting `watch()` forgets prior status, so the fir
 | `notify` | `NotifyConfig` | — | Alert destinations |
 | `screenshotsDir` | `string` | `./monitor-screenshots` | Where to save failure screenshots |
 | `reportsDir` | `string` | `.` | Where to save `monitor-report.html` |
-| `concurrency` | `number` | `4` | Max checks running at once against the shared browser |
+| `concurrency` | `number` | `4` | Positive integer limiting how many checks run at once |
 
 ### CheckConfig
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `name` | `string` | required | Human-readable label |
-| `url` | `string` | required | Full URL to navigate to |
-| `interval` | `string` | `"5m"` | Watch mode interval. Supports `"30s"`, `"5m"`, `"1h"`, `"2h30m"` |
+| `name` | `string` | required | Unique, non-empty label |
+| `url` | `string` | required | Absolute URL to navigate to |
+| `interval` | `string` | `"5m"` | Positive watch interval using `h`, `m`, and `s`, such as `"30s"`, `"2h30m"`, or `"1.5h"` |
 | `reAlertInterval` | `string` | off | Watch mode: re-send the down alert on this cadence while a check stays failing |
-| `retries` | `number` | `2` | Retry attempts before marking failed |
+| `retries` | `number` | `2` | Non-negative integer counting retry attempts before marking failed |
 | `timeout` | `number` | `10000` | Timeout per action in ms |
 | `screenshotOnFailure` | `boolean` | `true` | Save a screenshot on failure |
 | `steps` | `StepAction[]` | — | Multi-step journey actions |
 | `assertions` | `Assertion[]` | — | Assertions to verify after steps |
+
+Both `monitor run` and `monitor watch` validate the configuration before starting Chromium. Use `h`, `m`, and `s` for intervals and re-alert intervals. Scheduled intervals must fit within Node.js's timer limit of 2,147,483,647 milliseconds.
 | `maxResponseTimeMs` | `number` | — | Shorthand for `{ type: 'responseTime', maxMs }` assertion |
 
 ### Steps
@@ -194,7 +198,7 @@ notify: {
 
 ## GitHub Actions
 
-Drop this in `.github/workflows/monitor.yml` to run your checks every 15 minutes in CI:
+With `@alosha/monitor` installed and `package-lock.json` committed, add this to `.github/workflows/monitor.yml` to run your checks every 15 minutes:
 
 ```yaml
 name: Monitor
@@ -211,10 +215,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: npm install
-      - run: npx playwright install chromium --with-deps
-      - run: npx monitor run
+          node-version: 24
+      - run: npm ci
+      - run: npm exec --no -- playwright install chromium --with-deps
+      - run: npm exec --no -- monitor run
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       - uses: actions/upload-artifact@v4
@@ -251,3 +255,5 @@ Get in touch at [alosha.dev/support](https://alosha.dev/support).
 ---
 
 Docs & live demo: [monitor.alosha.dev](https://monitor.alosha.dev) · Built by [Alosha](https://alosha.dev)
+
+See the [changelog](https://github.com/avlisodraude/monitor/blob/main/CHANGELOG.md) for release notes and upgrade details.
