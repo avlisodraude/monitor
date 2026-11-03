@@ -8,7 +8,7 @@ export default defineConfig([
     dts: true,
     sourcemap: true,
     clean: true,
-    target: 'node18',
+    target: 'node20',
   },
   // CLI entry (ESM only, executable)
   {
@@ -16,7 +16,7 @@ export default defineConfig([
     format: ['esm'],
     banner: { js: '#!/usr/bin/env node' },
     sourcemap: true,
-    target: 'node18',
+    target: 'node20',
     noExternal: [],
   },
 ])
